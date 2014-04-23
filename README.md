@@ -14,7 +14,7 @@ var store = etcdjs('http://127.0.0.1:4001');
 
 store.set('hello', 'world', function(err, result) {
 	store.get('hello', function(err, result) {
-		console.log('hello:', result.value);
+		console.log('hello:', result.node.value);
 	});
 });
 ```
