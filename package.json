@@ -1,0 +1,10 @@
+{
+  "name": "etcdjs",
+  "version": "0.0.0",
+  "description": "Low level etcd v2 client written in Javascript",
+  "repository": "mafintosh/etcdjs",
+  "dependencies": {
+    "roundround": "^0.2.0",
+    "request": "^2.34.0"
+  }
+}
