@@ -27,7 +27,6 @@ var Client = function(host, opts) {
 	this._host = host;
 	this._json = opts.json;
 	this._timeout = opts.timeout || 60 * 1000;
-	this._prefix = '/v2/keys/'+(opts.namespace || '').replace(/\/$/, '')+'/';
 
 	this.stats = new Stats(this);
 };
@@ -172,7 +171,7 @@ Client.prototype.rmdir = function(key, opts, cb) {
 };
 
 Client.prototype._key = function(key) {
-	return this._prefix+(key[0] === '/' ? key.slice(1) : key);
+	return '/v2/keys/'+(key[0] === '/' ? key.slice(1) : key);
 };
 
 Client.prototype.machines = function(cb) {
