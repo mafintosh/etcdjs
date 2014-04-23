@@ -27,12 +27,9 @@ var Client = function(host, opts) {
 	this._host = host;
 	this._json = opts.json;
 	this._timeout = opts.timeout || 60 * 1000;
+	this._prefix = '/v2/keys/'+(opts.namespace || '').replace(/\/$/, '')+'/';
 
 	this.stats = new Stats(this);
-};
-
-var toKey = function(key) {
-	return '/v2/keys/'+(key[0] === '/' ? key.slice(1) : key);
 };
 
 Client.prototype.set = function(key, value, opts, cb) {
@@ -53,7 +50,7 @@ Client.prototype.set = function(key, value, opts, cb) {
 
 	this._request({
 		method: 'PUT',
-		uri: toKey(key),
+		uri: this._key(key),
 		form: form,
 		json: true
 	}, cb);
@@ -80,7 +77,7 @@ Client.prototype.get = function(key, opts, cb) {
 	if (opts.consistent) qs.consistent = 'true';
 
 	this._request({
-		uri: toKey(key),
+		uri: this._key(key),
 		qs: qs,
 		json: true,
 		pool: opts.wait ? false : undefined
@@ -143,7 +140,7 @@ Client.prototype.push = function(key, value, opts, cb) {
 
 	this._request({
 		method: 'POST',
-		uri: toKey(key),
+		uri: this._key(key),
 		form: {
 			value: value,
 			ttl: opts.ttl
@@ -164,6 +161,10 @@ Client.prototype.rmdir = function(key, opts, cb) {
 	if (!opts) opts = {};
 	opts.dir = true;
 	this.del(key, opts, cb);
+};
+
+Client.prototype._key = function(key) {
+	return this._prefix+(key[0] === '/' ? key.slice(1) : key);
 };
 
 Client.prototype.machines = function(cb) {
