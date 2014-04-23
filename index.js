@@ -215,10 +215,10 @@ Client.prototype._request = function(opts, cb) {
 		if (response.statusCode > 299)   return cb(toError(response));
 
 		var body = response.body;
-		if (!self.json) return cb(null, body);
+		if (!self._json) return cb(null, body);
 
 		try {
-			decodeJSON(body);
+			decodeJSON(body.node);
 		} catch (err) {
 			return cb(err);
 		}
