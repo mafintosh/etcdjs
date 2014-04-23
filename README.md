@@ -28,7 +28,8 @@ store.set('hello', 'world', function(err, result) {
 ``` js
 {
 	timeout: 60 * 1000, // default timeout for ops
-	json: false         // stringify/parse all values as JSON
+	json: false,        // stringify/parse all values as JSON
+	namespace: null     // set a key namespace
 }
 ```
 
