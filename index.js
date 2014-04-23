@@ -64,6 +64,7 @@ Client.prototype.update = function(key, value, opts, cb) {
 };
 
 Client.prototype.get = function(key, opts, cb) {
+	if (typeof key === 'function') return this.get('', null, key);
 	if (typeof opts === 'function') return this.get(key, null, opts);
 	if (!opts) opts = {};
 
@@ -103,6 +104,7 @@ Client.prototype.wait = function(key, opts, cb) {
 };
 
 Client.prototype.del = Client.prototype.delete = function(key, opts, cb) {
+	if (typeof key === 'function') return this.del('', null, key);
 	if (typeof opts === 'function') return this.del(key, null, opts);
 	if (!opts) opts = {};
 	if (!cb) cb = noop;
