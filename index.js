@@ -21,7 +21,7 @@ Stats.prototype.leader = function(cb) {
 };
 
 var Client = function(host, opts) {
-	if (!(this instanceof Client)) return new Client(host);
+	if (!(this instanceof Client)) return new Client(host, opts);
 	if (!opts) opts = {};
 
 	this._host = host;
