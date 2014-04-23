@@ -45,7 +45,7 @@ Client.prototype.set = function(key, value, opts, cb) {
 	if (opts.dir) form.dir = 'true';
 
 	if (opts.prevExist !== undefined) form.prevExist = ''+opts.prevExist;
-	if (opts.prevValue !== undefined) qs.prevValue = this._json ? JSON.stringify(opts.prevValue) : ''+opts.prevValue;
+	if (opts.prevValue !== undefined) form.prevValue = this._json ? JSON.stringify(opts.prevValue) : ''+opts.prevValue;
 	if (opts.prevIndex !== undefined) form.prevIndex = ''+opts.prevIndex;
 
 	this._request({
@@ -196,6 +196,7 @@ var toError = function(response) {
 	if (!body || !body.message) return new Error('bad status: '+response.statusCode);
 
 	var err = new Error(body.message);
+	err.code = body.errorCode;
 	err.cause = body.cause;
 	err.index = body.index;
 
@@ -210,8 +211,8 @@ Client.prototype._request = function(opts, cb) {
 	request(opts, function onresponse(err, response) {
 		if (err) return cb(err);
 
-		if (response.statusCode === 307) return request(opts.location = response.headers.location, opts, onresponse);
-		if (response.statusCode === 404) return cb();
+		if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse);
+		if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb();
 		if (response.statusCode > 299)   return cb(toError(response));
 
 		var body = response.body;
