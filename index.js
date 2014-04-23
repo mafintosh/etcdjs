@@ -134,12 +134,12 @@ Client.prototype.compareAndSwap = function(key, val, prevValue, opts, cb) {
 };
 
 Client.prototype.compareAndDelete = function(key, val, opts, cb) {
-	if (typeof opts === 'function') return this.compareAndDelete(key, null, opts);
+	if (typeof opts === 'function') return this.compareAndDelete(key, val, null, opts);
 	if (!opts) opts = {};
 	if (!cb) cb = noop;
 
 	opts.prevValue = val;
-	this.del(key, opts. cb);
+	this.del(key, opts, cb);
 };
 
 Client.prototype.push = function(key, value, opts, cb) {
