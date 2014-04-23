@@ -109,13 +109,19 @@ Client.prototype.del = Client.prototype.delete = function(key, opts, cb) {
 	if (!opts) opts = {};
 	if (!cb) cb = noop;
 
+	var qs = {};
 	if (opts.prevExist !== undefined) qs.prevExist = ''+opts.prevExist;
 	if (opts.prevValue !== undefined) qs.prevValue = this._json ? JSON.stringify(opts.prevValue) : ''+opts.prevValue;
 	if (opts.prevIndex !== undefined) qs.prevIndex = ''+opts.prevIndex;
 	if (opts.recursive) qs.recursive = 'true';
 	if (opts.dir) qs.dir = 'true';
 
-	this._request({method:'DELETE', uri:'/v2/keys/'+key}, cb);
+	this._request({
+		method: 'DELETE',
+		uri: this._key(key),
+		qs: qs,
+		json: true
+	}, cb);
 };
 
 Client.prototype.compareAndSwap = function(key, val, prevValue, opts, cb) {
