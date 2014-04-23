@@ -82,7 +82,8 @@ Client.prototype.get = function(key, opts, cb) {
 	this._request({
 		uri: toKey(key),
 		qs: qs,
-		json: true
+		json: true,
+		pool: opts.wait ? false : undefined
 	}, cb);
 };
 
@@ -136,8 +137,8 @@ Client.prototype.compareAndDelete = function(key, val, opts, cb) {
 	this.del(key, opts. cb);
 };
 
-Client.prototype.create = function(key, value, opts, cb) {
-	if (typeof opts === 'function') return this.create(key, value, null, opts);
+Client.prototype.push = function(key, value, opts, cb) {
+	if (typeof opts === 'function') return this.push(key, value, null, opts);
 	if (!opts) opts = {};
 
 	this._request({
