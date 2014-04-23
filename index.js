@@ -40,7 +40,7 @@ Client.prototype.set = function(key, value, opts, cb) {
 	var form = {};
 
 	if (value) form.value = value;
-	if (opts.ttl) form.ttl = 'true';
+	if (opts.ttl) form.ttl = ''+opts.ttl;
 	if (opts.dir) form.dir = 'true';
 
 	if (opts.prevExist !== undefined) form.prevExist = ''+opts.prevExist;
