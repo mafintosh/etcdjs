@@ -126,6 +126,10 @@ Returns an array of all machines in the cluster
 
 Returns the leader of the cluster
 
+#### `store.destroy()`
+
+Destroy the client and all open connections
+
 ## Stats
 
 #### `store.stats.self([node], cb)`
