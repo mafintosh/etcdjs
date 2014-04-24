@@ -10,7 +10,7 @@ Pass a connection string
 
 ``` js
 var etcdjs = require('etcdjs');
-var store = etcdjs('http://127.0.0.1:4001');
+var store = etcdjs('127.0.0.1:4001');
 
 store.set('hello', 'world', function(err, result) {
 	store.get('hello', function(err, result) {
@@ -19,16 +19,26 @@ store.set('hello', 'world', function(err, result) {
 });
 ```
 
+If you have more than run instance of etcd running you can pass an array to load balance
+
+``` js
+var store = etcdjs(['127.0.0.1:4001', '127.0.0.1:4002', '127.0.0.1:4003'])
+```
+
+`etcdjs` will automatically refresh its internal host list every 30s so you can transparently
+add more machines to your cluster without updating your seed host list.
+
 ## API
 
 #### `store = ectd(host, opts)`
 
-`host` should be a etcd host and `opts` default to
+`host` should be a etcd host (or an array of hosts) and `opts` default to
 
 ``` js
 {
-	timeout: 60 * 1000, // default timeout for ops
-	json: false         // stringify/parse all values as JSON
+	refresh: true,         // refresh the interval host list automatically
+	timeout: 60 * 1000,    // default timeout for ops
+	json: false            // stringify/parse all values as JSON
 }
 ```
 

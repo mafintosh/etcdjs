@@ -43,8 +43,14 @@ var Client = function(host, opts) {
 	this._timeout = opts.timeout || 60 * 1000;
 	this._next = roundround(this._hosts);
 	this._refresh = opts.refresh !== false;
+	this._requests = [];
 
 	this.stats = new Stats(this);
+
+	if (!this._refresh) return;
+
+	this._interval = setInterval(this.machines.bind(this, noop), 30*1000);
+	if (this._interval.unref) this._interval.unref();
 };
 
 Client.prototype.set = function(key, value, opts, cb) {
@@ -216,6 +222,14 @@ Client.prototype.leader = function(cb) {
 	this._request({uri:'/v2/leader'}, cb);
 };
 
+Client.prototype.destroy = function() {
+	if (this._interval) clearInterval(this._interval);
+	this._requests.forEach(function(request) {
+		if (request) request.destroy();
+	});
+	this._requests = [];
+};
+
 var decodeJSON = function(node) {
 	if (node.nodes) node.nodes.forEach(decodeAll);
 	if (node.value !== undefined) node.value = JSON.parse(node.value);
@@ -233,15 +247,24 @@ var toError = function(response) {
 	return err;
 };
 
+var gc = function(list, item) {
+	var i = list.lastIndexOf(item);
+	if (i === -1) return;
+	if (i < list.length-1) list.pop();
+	else if (i === 0) list.shift();
+	else list.splice(i, 1);
+};
+
 Client.prototype._request = function(opts, cb) {
 	var self = this;
 	var tries = this._hosts.length;
 	var path = opts.uri[0] === '/' && opts.uri;
-
 	if (path) opts.uri = this._next() + path;
-
 	opts.timeout = this._timeout;
-	request(opts, function onresponse(err, response) {
+
+	var req = request(opts, function onresponse(err, response) {
+		gc(self._requests, req);
+
 		if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse);
 		if (err) return cb(err);
 
@@ -260,6 +283,8 @@ Client.prototype._request = function(opts, cb) {
 
 		cb(null, body);
 	});
+
+	this._requests.push(req);
 };
 
 module.exports = Client;
