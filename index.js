@@ -20,13 +20,29 @@ Stats.prototype.leader = function(cb) {
 	this._client._request({uri:'/v2/stats/leader', json:true}, cb);
 };
 
+var normalizeUrl = function(url) {
+	url = url.indexOf('://') === -1 ? 'http://'+url : url;
+	url = url.replace(/\/$/, '');
+	if (!/:\d+/.test(url)) url += ':4001';
+	return url;
+};
+
 var Client = function(host, opts) {
 	if (!(this instanceof Client)) return new Client(host, opts);
+
+	if (typeof host === 'object' && host && !Array.isArray(host)) { // overloaded - this is probably a bad idea
+		opts = host;
+		host = null;
+	}
+
 	if (!opts) opts = {};
 
-	this._host = host;
-	this._json = opts.json;
+	this._hosts = [].concat(host || opts.host || opts.hosts).map(normalizeUrl);
+	this._prev = this._hosts.join(',');
+	this._json = opts.json || false;
 	this._timeout = opts.timeout || 60 * 1000;
+	this._next = roundround(this._hosts);
+	this._refresh = opts.refresh !== false;
 
 	this.stats = new Stats(this);
 };
@@ -175,9 +191,24 @@ Client.prototype._key = function(key) {
 };
 
 Client.prototype.machines = function(cb) {
+	var self = this;
 	this._request({uri:'/v2/machines'}, function(err, body) {
 		if (err) return cb(err);
-		cb(null, body.trim().split(/\s*,\s*/));
+
+		body = body.trim();
+		var hosts = body.split(/\s*,\s*/);
+
+		if (self._refresh && body !== self._prev) {
+			self._prev = body;
+			for (var i = 0; i < self._hosts.length; i++) {
+				if (hosts.indexOf(self._hosts[i]) === -1) self._hosts.splice(i--, 1);
+			}
+			for (var i = 0; i < hosts.length; i++) {
+				if (self._hosts.indexOf(hosts[i]) === -1) self._hosts.push(hosts[i]);
+			}
+		}
+
+		cb(null, hosts);
 	});
 };
 
@@ -203,16 +234,20 @@ var toError = function(response) {
 };
 
 Client.prototype._request = function(opts, cb) {
-	if (opts.uri[0] === '/') opts.uri = this._host + opts.uri;
-
 	var self = this;
+	var tries = this._hosts.length;
+	var path = opts.uri[0] === '/' && opts.uri;
+
+	if (path) opts.uri = this._next() + path;
+
 	opts.timeout = this._timeout;
 	request(opts, function onresponse(err, response) {
+		if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse);
 		if (err) return cb(err);
 
 		if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse);
 		if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb();
-		if (response.statusCode > 299)   return cb(toError(response));
+		if (response.statusCode > 299) return cb(toError(response));
 
 		var body = response.body;
 		if (!self._json || !body.node) return cb(null, body);
