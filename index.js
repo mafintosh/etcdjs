@@ -37,7 +37,7 @@ var Client = function(host, opts) {
 
 	if (!opts) opts = {};
 
-	this._hosts = [].concat(host || opts.host || opts.hosts).map(normalizeUrl);
+	this._hosts = [].concat(host || opts.host || opts.hosts || '127.0.0.1').map(normalizeUrl);
 	this._prev = this._hosts.join(',');
 	this._json = opts.json || false;
 	this._timeout = opts.timeout || 60 * 1000;
