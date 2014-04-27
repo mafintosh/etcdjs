@@ -44,6 +44,7 @@ var Client = function(host, opts) {
 	this._next = roundround(this._hosts);
 	this._refresh = opts.refresh !== false;
 	this._requests = [];
+	this._destroyed = false;
 
 	this.stats = new Stats(this);
 
@@ -223,9 +224,12 @@ Client.prototype.leader = function(cb) {
 };
 
 Client.prototype.destroy = function() {
+	this._destroyed = true;
 	if (this._interval) clearInterval(this._interval);
 	this._requests.forEach(function(request) {
-		if (request) request.destroy();
+		request.abort();
+		if (request.timeoutTimer) clearTimeout(request.timeoutTimer);
+		if (request.listeners('error').length) request.emit('error', new Error('store destroyed'));
 	});
 	this._requests = [];
 };
@@ -250,9 +254,15 @@ var toError = function(response) {
 var gc = function(list, item) {
 	var i = list.lastIndexOf(item);
 	if (i === -1) return;
-	if (i < list.length-1) list.pop();
+	if (i === list.length-1) list.pop();
 	else if (i === 0) list.shift();
 	else list.splice(i, 1);
+};
+
+var nextTick = function(cb, err, val) {
+	process.nextTick(function() {
+		cb(err, val);
+	});
 };
 
 Client.prototype._request = function(opts, cb) {
@@ -262,9 +272,12 @@ Client.prototype._request = function(opts, cb) {
 	if (path) opts.uri = this._next() + path;
 	opts.timeout = this._timeout;
 
+	if (this._destroyed) return nextTick(cb, new Error('store destroyed'));
+
 	var req = request(opts, function onresponse(err, response) {
 		gc(self._requests, req);
 
+		if (self._destroyed) return cb(new Error('store destroyed'));
 		if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse);
 		if (err) return cb(err);
 
