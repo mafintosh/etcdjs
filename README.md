@@ -30,7 +30,7 @@ add more machines to your cluster without updating your seed host list.
 
 ## API
 
-#### `store = ectd(host, opts)`
+#### `store = etcd(host, opts)`
 
 `host` should be a etcd host (or an array of hosts) and `opts` default to
 
