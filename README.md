@@ -106,6 +106,16 @@ store.wait('hello', function onchange(err, result, next) {
 });
 ```
 
+`.wait` returns a destroy function which can be used to kill a waiting request.
+
+``` js
+var destroy = store.wait('hello', function onchange(err, result, next) {
+});
+
+destroy();
+store.set('key', 'value'); // won't trigger the wait
+```
+
 #### `store.compareAndSwap(key, value, prevValue, [opts], [cb])`
 
 Only set if `prevValue` matches previous value. Similar to `set(key, value, {prevValue:prevValue})`
