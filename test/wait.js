@@ -7,9 +7,7 @@ test('wait', function(store, t) {
 		t.end();
 	});
 
-	setTimeout(function() {
-		store.set('etcdjs/test', 'value');
-	}, 100);
+	store.set('etcdjs/test', 'value');
 });
 
 test('wait twice', function(store, t) {
@@ -23,8 +21,19 @@ test('wait twice', function(store, t) {
 		t.end();
 	});
 
+	store.set('etcdjs/test', 'a');
+	store.set('etcdjs/test', 'b');
+});
+
+test('cancel wait', function(store, t) {
+	var stop_wait = store.wait('etcdjs/test', function(err, result) {
+		t.fail();
+	});
+
+	stop_wait();
+	store.set('etcdjs/test', 'value');
+
 	setTimeout(function() {
-		store.set('etcdjs/test', 'a');
-		store.set('etcdjs/test', 'b');
+		t.end();
 	}, 100);
 });

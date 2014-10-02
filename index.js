@@ -99,7 +99,7 @@ Client.prototype.get = function(key, opts, cb) {
 	if (opts.sorted) qs.sorted = 'true';
 	if (opts.consistent) qs.consistent = 'true';
 
-	this._request({
+	return this._request({
 		uri: this._key(key),
 		qs: qs,
 		json: true,
@@ -117,7 +117,7 @@ Client.prototype.wait = function(key, opts, cb) {
 		self.wait(key, opts, cb);
 	};
 
-	this.get(key, opts, function onresult(err, result) {
+	return this.get(key, opts, function onresult(err, result) {
 		if (err && err.code === 'ETIMEDOUT') return self.get(key, opts, onresult);
 		if (result) opts.waitIndex = result.node.modifiedIndex + 1;
 		if (err) return cb(err, null, next);
@@ -272,11 +272,14 @@ Client.prototype._request = function(opts, cb) {
 	if (path) opts.uri = this._next() + path;
 	opts.timeout = this._timeout;
 
+	var canceled = false;
+
 	if (this._destroyed) return nextTick(cb, new Error('store destroyed'));
 
 	var req = request(opts, function onresponse(err, response) {
 		gc(self._requests, req);
 
+		if (canceled) return;
 		if (self._destroyed) return cb(new Error('store destroyed'));
 		if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse);
 		if (err) return cb(err);
@@ -298,6 +301,11 @@ Client.prototype._request = function(opts, cb) {
 	});
 
 	this._requests.push(req);
+
+	return function destroy() {
+		canceled = true;
+		req.end();
+	};
 };
 
 module.exports = Client;
