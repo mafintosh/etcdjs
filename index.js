@@ -42,7 +42,7 @@ var Client = function(host, opts) {
 	this._json = opts.json || false;
 	this._timeout = opts.timeout || 60 * 1000;
 	this._next = roundround(this._hosts);
-	this._refresh = opts.refresh !== false;
+	this._refresh = opts.refresh || false;
 	this._requests = [];
 	this._destroyed = false;
 

@@ -36,11 +36,13 @@ add more machines to your cluster without updating your seed host list.
 
 ``` js
 {
-	refresh: true,         // refresh the interval host list automatically
+	refresh: false,        // refresh the interval host list automatically
 	timeout: 60 * 1000,    // default timeout for ops
 	json: false            // stringify/parse all values as JSON
 }
 ```
+
+**Note:** The `refresh` option will try to discover additional etcd hosts via the etcd `/machines` endpoint which may not always return hostnames which are routable. Make sure the endpoint returns what you expect before turning on this feature.
 
 #### `store.get(key, [opts], cb)`
 
