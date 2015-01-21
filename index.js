@@ -304,7 +304,7 @@ Client.prototype._request = function(opts, cb) {
 
 	return function destroy() {
 		canceled = true;
-		req.end();
+		req.abort();
 	};
 };
 
