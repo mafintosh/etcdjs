@@ -1,311 +1,374 @@
-var request = require('request');
-var roundround = require('roundround');
+var request = require('request')
+var roundround = require('roundround')
 
-var noop = function() {};
+var noop = function () {}
 
-var Stats = function(client) {
-	this._client = client;
-};
+var Stats = function (client) {
+  this._client = client
+}
 
-Stats.prototype.self = function(machine, cb) {
-	if (typeof machine === 'function') return this.self(null, machine);
-	this._client._request({uri:(machine || '')+'/v2/stats/self', json:true}, cb);
-};
+Stats.prototype.self = function (machine, cb) {
+  if (typeof machine === 'function') return this.self(null, machine)
+  this._client._request({uri: (machine || '') + '/v2/stats/self', json: true}, cb)
+}
 
-Stats.prototype.store = function(cb) {
-	this._client._request({uri:'/v2/stats/store', json:true}, cb);
-};
+Stats.prototype.store = function (cb) {
+  this._client._request({uri: '/v2/stats/store', json: true}, cb)
+}
 
-Stats.prototype.leader = function(cb) {
-	this._client._request({uri:'/v2/stats/leader', json:true}, cb);
-};
+Stats.prototype.leader = function (cb) {
+  this._client._request({uri: '/v2/stats/leader', json: true}, cb)
+}
 
-var normalizeUrl = function(url) {
-	url = url.indexOf('://') === -1 ? 'http://'+url : url;
-	url = url.replace(/\/$/, '');
-	if (!/:\d+/.test(url)) url += ':4001';
-	return url;
-};
+var normalizeUrl = function (url) {
+  url = url.indexOf('://') === -1 ? 'http://' + url : url
+  url = url.replace(/\/$/, '')
+  if (!/:\d+/.test(url)) url += ':4001'
+  return url
+}
 
-var Client = function(host, opts) {
-	if (!(this instanceof Client)) return new Client(host, opts);
+var Client = function (host, opts) {
+  if (!(this instanceof Client)) return new Client(host, opts)
 
-	if (typeof host === 'object' && host && !Array.isArray(host)) { // overloaded - this is probably a bad idea
-		opts = host;
-		host = null;
-	}
+  if (typeof host === 'object' && host && !Array.isArray(host)) { // overloaded - this is probably a bad idea
+    opts = host
+    host = null
+  }
 
-	if (!opts) opts = {};
+  if (!opts) opts = {}
 
-	this._hosts = [].concat(host || opts.host || opts.hosts || '127.0.0.1').map(normalizeUrl);
-	this._prev = this._hosts.join(',');
-	this._json = opts.json || false;
-	this._timeout = opts.timeout || 60 * 1000;
-	this._next = roundround(this._hosts);
-	this._refresh = opts.refresh || false;
-	this._requests = [];
-	this._destroyed = false;
+  var disc = /^https:\/\/discovery.etcd.io\//.test(host || '')
 
-	this.stats = new Stats(this);
+  this._discovery = disc ? host : null
 
-	if (!this._refresh) return;
+  if (disc) this._hosts = []
+  else this._hosts = [].concat(host || opts.host || opts.hosts || '127.0.0.1').map(normalizeUrl)
 
-	this._interval = setInterval(this.machines.bind(this, noop), 30*1000);
-	if (this._interval.unref) this._interval.unref();
-};
+  this._prev = this._hosts.join(',')
+  this._json = opts.json || false
+  this._timeout = opts.timeout || 60 * 1000
+  this._next = roundround(this._hosts)
+  this._refresh = opts.refresh || false
+  this._requests = []
+  this._interval = null
+  this._destroyed = false
+  this._wait = null
 
-Client.prototype.set = function(key, value, opts, cb) {
-	if (typeof opts === 'function') return this.set(key, value, null, opts);
-	if (!opts) opts = {};
-	if (!cb) cb = noop;
-	if (this._json) value = JSON.stringify(value);
+  this.stats = new Stats(this)
+  if (this._refresh) this.autoRefresh()
+}
 
-	var form = {};
+Client.prototype.autoRefresh = function () {
+  if (this._interval) clearInterval(this._interval)
+  this._refresh = true
+  this._interval = setInterval(this.machines.bind(this, noop), 30 * 1000)
+  if (this._interval.unref) this._interval.unref()
+}
 
-	if (value) form.value = value;
-	if (opts.ttl) form.ttl = ''+opts.ttl;
-	if (opts.dir) form.dir = 'true';
+Client.prototype.set = function (key, value, opts, cb) {
+  if (typeof opts === 'function') return this.set(key, value, null, opts)
+  if (!opts) opts = {}
+  if (!cb) cb = noop
+  if (this._json) value = JSON.stringify(value)
 
-	if (opts.prevExist !== undefined) form.prevExist = ''+opts.prevExist;
-	if (opts.prevValue !== undefined) form.prevValue = this._json ? JSON.stringify(opts.prevValue) : ''+opts.prevValue;
-	if (opts.prevIndex !== undefined) form.prevIndex = ''+opts.prevIndex;
+  var form = {}
 
-	this._request({
-		method: 'PUT',
-		uri: this._key(key),
-		form: form,
-		json: true
-	}, cb);
-};
+  if (value) form.value = value
+  if (opts.ttl) form.ttl = '' + opts.ttl
+  if (opts.dir) form.dir = 'true'
 
-Client.prototype.update = function(key, value, opts, cb) {
-	if (typeof opts === 'function') return this.update(key, value, null, opts);
-	if (!opts) opts = {};
-	opts.prevExist = true;
-	this.set(key, value, opts, cb);
-};
+  if (opts.prevExist !== undefined) form.prevExist = '' + opts.prevExist
+  if (opts.prevValue !== undefined) form.prevValue = this._json ? JSON.stringify(opts.prevValue) : '' + opts.prevValue
+  if (opts.prevIndex !== undefined) form.prevIndex = '' + opts.prevIndex
 
-Client.prototype.get = function(key, opts, cb) {
-	if (typeof key === 'function') return this.get('', null, key);
-	if (typeof opts === 'function') return this.get(key, null, opts);
-	if (!opts) opts = {};
+  this._request({
+    method: 'PUT',
+    uri: this._key(key),
+    form: form,
+    json: true
+  }, cb)
+}
 
-	var self = this;
-	var qs = {};
+Client.prototype.update = function (key, value, opts, cb) {
+  if (typeof opts === 'function') return this.update(key, value, null, opts)
+  if (!opts) opts = {}
+  opts.prevExist = true
+  this.set(key, value, opts, cb)
+}
 
-	if (opts.wait) qs.wait = 'true';
-	if (opts.waitIndex !== undefined) qs.waitIndex = ''+opts.waitIndex;
-	if (opts.recursive) qs.recursive = 'true';
-	if (opts.sorted) qs.sorted = 'true';
-	if (opts.consistent) qs.consistent = 'true';
+Client.prototype.get = function (key, opts, cb) {
+  if (typeof key === 'function') return this.get('', null, key)
+  if (typeof opts === 'function') return this.get(key, null, opts)
+  if (!opts) opts = {}
 
-	return this._request({
-		uri: this._key(key),
-		qs: qs,
-		json: true,
-		pool: opts.wait ? false : undefined
-	}, cb);
-};
+  var qs = {}
+  if (opts.wait) qs.wait = 'true'
+  if (opts.waitIndex !== undefined) qs.waitIndex = '' + opts.waitIndex
+  if (opts.recursive) qs.recursive = 'true'
+  if (opts.sorted) qs.sorted = 'true'
+  if (opts.consistent) qs.consistent = 'true'
 
-Client.prototype.wait = function(key, opts, cb) {
-	if (typeof opts === 'function') return this.wait(key, null, opts);
-	if (!opts) opts = {};
-	opts.wait = true;
+  return this._request({
+    uri: this._key(key),
+    qs: qs,
+    json: true,
+    pool: opts.wait ? false : undefined
+  }, cb)
+}
 
-	var self = this;
-	var next = function(cb) {
-		self.wait(key, opts, cb);
-	};
+Client.prototype.wait = function (key, opts, cb) {
+  if (typeof opts === 'function') return this.wait(key, null, opts)
+  if (!opts) opts = {}
+  opts.wait = true
 
-	return this.get(key, opts, function onresult(err, result) {
-		if (err && err.code === 'ETIMEDOUT') return self.get(key, opts, onresult);
-		if (result) opts.waitIndex = result.node.modifiedIndex + 1;
-		if (err) return cb(err, null, next);
-		cb(null, result, next);
-	});
-};
+  var self = this
+  var next = function (cb) {
+    self.wait(key, opts, cb)
+  }
 
-Client.prototype.del = Client.prototype.delete = function(key, opts, cb) {
-	if (typeof key === 'function') return this.del('', null, key);
-	if (typeof opts === 'function') return this.del(key, null, opts);
-	if (!opts) opts = {};
-	if (!cb) cb = noop;
+  return this.get(key, opts, function onresult (err, result) {
+    if (err && err.code === 'ETIMEDOUT') return self.get(key, opts, onresult)
+    if (result) opts.waitIndex = result.node.modifiedIndex + 1
+    if (err) return cb(err, null, next)
+    cb(null, result, next)
+  })
+}
 
-	var qs = {};
-	if (opts.prevExist !== undefined) qs.prevExist = ''+opts.prevExist;
-	if (opts.prevValue !== undefined) qs.prevValue = this._json ? JSON.stringify(opts.prevValue) : ''+opts.prevValue;
-	if (opts.prevIndex !== undefined) qs.prevIndex = ''+opts.prevIndex;
-	if (opts.recursive) qs.recursive = 'true';
-	if (opts.dir) qs.dir = 'true';
+Client.prototype.del = Client.prototype.delete = function (key, opts, cb) {
+  if (typeof key === 'function') return this.del('', null, key)
+  if (typeof opts === 'function') return this.del(key, null, opts)
+  if (!opts) opts = {}
+  if (!cb) cb = noop
 
-	this._request({
-		method: 'DELETE',
-		uri: this._key(key),
-		qs: qs,
-		json: true
-	}, cb);
-};
+  var qs = {}
+  if (opts.prevExist !== undefined) qs.prevExist = '' + opts.prevExist
+  if (opts.prevValue !== undefined) qs.prevValue = this._json ? JSON.stringify(opts.prevValue) : '' + opts.prevValue
+  if (opts.prevIndex !== undefined) qs.prevIndex = '' + opts.prevIndex
+  if (opts.recursive) qs.recursive = 'true'
+  if (opts.dir) qs.dir = 'true'
 
-Client.prototype.compareAndSwap = function(key, val, prevValue, opts, cb) {
-	if (typeof opts === 'function') return this.compareAndSwap(key, val, prevValue, null, opts);
-	if (!opts) opts = {};
-	if (!cb) cb = noop;
+  this._request({
+    method: 'DELETE',
+    uri: this._key(key),
+    qs: qs,
+    json: true
+  }, cb)
+}
 
-	opts.prevValue = prevValue;
-	this.set(key, val, opts, cb);
-};
+Client.prototype.compareAndSwap = function (key, val, prevValue, opts, cb) {
+  if (typeof opts === 'function') return this.compareAndSwap(key, val, prevValue, null, opts)
+  if (!opts) opts = {}
+  if (!cb) cb = noop
 
-Client.prototype.compareAndDelete = function(key, val, opts, cb) {
-	if (typeof opts === 'function') return this.compareAndDelete(key, val, null, opts);
-	if (!opts) opts = {};
-	if (!cb) cb = noop;
+  opts.prevValue = prevValue
+  this.set(key, val, opts, cb)
+}
 
-	opts.prevValue = val;
-	this.del(key, opts, cb);
-};
+Client.prototype.compareAndDelete = function (key, val, opts, cb) {
+  if (typeof opts === 'function') return this.compareAndDelete(key, val, null, opts)
+  if (!opts) opts = {}
+  if (!cb) cb = noop
 
-Client.prototype.push = function(key, value, opts, cb) {
-	if (typeof opts === 'function') return this.push(key, value, null, opts);
-	if (!opts) opts = {};
+  opts.prevValue = val
+  this.del(key, opts, cb)
+}
 
-	this._request({
-		method: 'POST',
-		uri: this._key(key),
-		form: {
-			value: value,
-			ttl: opts.ttl
-		},
-		json: true
-	}, cb);
-};
+Client.prototype.push = function (key, value, opts, cb) {
+  if (typeof opts === 'function') return this.push(key, value, null, opts)
+  if (!opts) opts = {}
 
-Client.prototype.mkdir = function(key, opts, cb) {
-	if (typeof opts === 'function') return this.mkdir(key, null, opts);
-	if (!opts) opts = {};
-	opts.dir = true;
-	this.set(key, null, opts, cb);
-};
+  this._request({
+    method: 'POST',
+    uri: this._key(key),
+    form: {
+      value: value,
+      ttl: opts.ttl
+    },
+    json: true
+  }, cb)
+}
 
-Client.prototype.rmdir = function(key, opts, cb) {
-	if (typeof opts === 'function') return this.rmdir(key, null, opts);
-	if (!opts) opts = {};
-	opts.dir = true;
-	this.del(key, opts, cb);
-};
+Client.prototype.mkdir = function (key, opts, cb) {
+  if (typeof opts === 'function') return this.mkdir(key, null, opts)
+  if (!opts) opts = {}
+  opts.dir = true
+  this.set(key, null, opts, cb)
+}
 
-Client.prototype._key = function(key) {
-	return '/v2/keys/'+(key[0] === '/' ? key.slice(1) : key);
-};
+Client.prototype.rmdir = function (key, opts, cb) {
+  if (typeof opts === 'function') return this.rmdir(key, null, opts)
+  if (!opts) opts = {}
+  opts.dir = true
+  this.del(key, opts, cb)
+}
 
-Client.prototype.machines = function(cb) {
-	var self = this;
-	this._request({uri:'/v2/machines'}, function(err, body) {
-		if (err) return cb(err);
+Client.prototype._key = function (key) {
+  return '/v2/keys/' + (key[0] === '/' ? key.slice(1) : key)
+}
 
-		body = body.trim();
-		var hosts = body.split(/\s*,\s*/);
+Client.prototype.machines = function (cb) {
+  var self = this
+  this._request({uri: '/v2/machines'}, function (err, body) {
+    if (err) return cb(err)
 
-		if (self._refresh && body !== self._prev) {
-			self._prev = body;
-			for (var i = 0; i < self._hosts.length; i++) {
-				if (hosts.indexOf(self._hosts[i]) === -1) self._hosts.splice(i--, 1);
-			}
-			for (var i = 0; i < hosts.length; i++) {
-				if (self._hosts.indexOf(hosts[i]) === -1) self._hosts.push(hosts[i]);
-			}
-		}
+    body = body.trim()
+    var hosts = body.split(/\s*,\s*/)
 
-		cb(null, hosts);
-	});
-};
+    if (self._refresh && body !== self._prev) {
+      self._prev = body
+      for (var i = 0; i < self._hosts.length; i++) {
+        if (hosts.indexOf(self._hosts[i]) === -1) self._hosts.splice(i--, 1)
+      }
+      for (var j = 0; j < hosts.length; j++) {
+        if (self._hosts.indexOf(hosts[j]) === -1) self._hosts.push(hosts[i])
+      }
+    }
 
-Client.prototype.leader = function(cb) {
-	this._request({uri:'/v2/leader'}, cb);
-};
+    cb(null, hosts)
+  })
+}
 
-Client.prototype.destroy = function() {
-	this._destroyed = true;
-	if (this._interval) clearInterval(this._interval);
-	this._requests.forEach(function(request) {
-		request.abort();
-		if (request.timeoutTimer) clearTimeout(request.timeoutTimer);
-		if (request.listeners('error').length) request.emit('error', new Error('store destroyed'));
-	});
-	this._requests = [];
-};
+Client.prototype.leader = function (cb) {
+  this._request({uri: '/v2/leader'}, cb)
+}
 
-var decodeJSON = function(node) {
-	if (node.nodes) node.nodes.forEach(decodeAll);
-	if (node.value !== undefined) node.value = JSON.parse(node.value);
-};
+Client.prototype.destroy = function () {
+  this._destroyed = true
+  if (this._interval) clearInterval(this._interval)
+  this._requests.forEach(function (request) {
+    request.abort()
+    if (request.timeoutTimer) clearTimeout(request.timeoutTimer)
+    if (request.listeners('error').length) request.emit('error', new Error('store destroyed'))
+  })
+  this._requests = []
+}
 
-var toError = function(response) {
-	var body = response.body;
-	if (!body || !body.message) return new Error('bad status: '+response.statusCode);
+var decodeJSON = function (node) {
+  if (node.nodes) node.nodes.forEach(decodeJSON)
+  if (node.value !== undefined) node.value = JSON.parse(node.value)
+}
 
-	var err = new Error(body.message);
-	err.code = body.errorCode;
-	err.cause = body.cause;
-	err.index = body.index;
+var toError = function (response) {
+  var body = response.body
+  if (!body || !body.message) return new Error('bad status: ' + response.statusCode)
 
-	return err;
-};
+  var err = new Error(body.message)
+  err.code = body.errorCode
+  err.cause = body.cause
+  err.index = body.index
 
-var gc = function(list, item) {
-	var i = list.lastIndexOf(item);
-	if (i === -1) return;
-	if (i === list.length-1) list.pop();
-	else if (i === 0) list.shift();
-	else list.splice(i, 1);
-};
+  return err
+}
 
-var nextTick = function(cb, err, val) {
-	process.nextTick(function() {
-		cb(err, val);
-	});
-};
+var gc = function (list, item) {
+  var i = list.lastIndexOf(item)
+  if (i === -1) return
+  if (i === list.length - 1) list.pop()
+  else if (i === 0) list.shift()
+  else list.splice(i, 1)
+}
 
-Client.prototype._request = function(opts, cb) {
-	var self = this;
-	var tries = this._hosts.length;
-	var path = opts.uri[0] === '/' && opts.uri;
-	if (path) opts.uri = this._next() + path;
-	opts.timeout = this._timeout;
+var nextTick = function (cb, err, val) {
+  process.nextTick(function () {
+    cb(err, val)
+  })
+}
 
-	var canceled = false;
+Client.prototype._request = function (opts, cb) {
+  if (this._discovery) return this._discoveryAndRequest(opts, cb)
+  return this._request2(opts, cb)
+}
 
-	if (this._destroyed) return nextTick(cb, new Error('store destroyed'));
+Client.prototype._discoveryAndRequest = function (opts, cb) {
+  if (!cb) cb = noop
 
-	var req = request(opts, function onresponse(err, response) {
-		gc(self._requests, req);
+  var fn
+  var destroyed = false
+  var self = this
 
-		if (canceled) return;
-		if (self._destroyed) return cb(new Error('store destroyed'));
-		if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse);
-		if (err) return cb(err);
+  this._resolveToken(function (err) {
+    if (destroyed) return
+    if (err) return cb(err)
+    fn = self._request2(opts, cb)
+  })
 
-		if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse);
-		if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb();
-		if (response.statusCode > 299) return cb(toError(response));
+  return function destroy () {
+    destroyed = true
+    if (fn) fn()
+  }
+}
 
-		var body = response.body;
-		if (!self._json || !body.node) return cb(null, body);
+Client.prototype._resolveToken = function (cb) {
+  if (this._wait) return this._wait.push(cb)
+  this._wait = []
 
-		try {
-			decodeJSON(body.node);
-		} catch (err) {
-			return cb(err);
-		}
+  var self = this
+  var done = function (err) {
+    self._discovery = null
+    cb(err)
+    while (self._wait.length) self._wait.shift()(err)
+    self._wait = null
+  }
 
-		cb(null, body);
-	});
+  request(this._discovery, {json: true}, function (err, response) {
+    if (err) return done(err)
+    if (response.statusCode !== 200) return done(new Error('discovery token could not be resolved'))
 
-	this._requests.push(req);
+    var nodes = response.body.node.nodes.map(function (node) {
+      return node.value
+    })
 
-	return function destroy() {
-		canceled = true;
-		req.abort();
-	};
-};
+    self._hosts = nodes
+    self._prev = nodes.join(',')
+    self._next = roundround(self._hosts)
+    self.autoRefresh() // we are doing auto discovery
+    self._discovery = null
 
-module.exports = Client;
+    done()
+  })
+}
+
+Client.prototype._request2 = function (opts, cb) {
+  var self = this
+  var tries = this._hosts.length
+  var path = opts.uri[0] === '/' && opts.uri
+  if (path) opts.uri = this._next() + path
+  opts.timeout = this._timeout
+
+  var canceled = false
+
+  if (this._destroyed) return nextTick(cb, new Error('store destroyed'))
+
+  var req = request(opts, function onresponse (err, response) {
+    gc(self._requests, req)
+
+    if (canceled) return
+    if (self._destroyed) return cb(new Error('store destroyed'))
+    if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse)
+    if (err) return cb(err)
+
+    if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse)
+    if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb()
+    if (response.statusCode > 299) return cb(toError(response))
+
+    var body = response.body
+    if (!self._json || !body.node) return cb(null, body)
+
+    try {
+      decodeJSON(body.node)
+    } catch (err) {
+      return cb(err)
+    }
+
+    cb(null, body)
+  })
+
+  this._requests.push(req)
+
+  return function destroy () {
+    canceled = true
+    req.abort()
+  }
+}
+
+module.exports = Client
