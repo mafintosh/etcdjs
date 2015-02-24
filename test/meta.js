@@ -4,7 +4,7 @@ test('machines', function (store, t) {
   store.machines(function (err, machines) {
     t.ok(!err)
     t.ok(Array.isArray(machines))
-    t.ok(machines.indexOf('http://127.0.0.1:4001') > -1)
+    t.ok(machines.indexOf('http://127.0.0.1:4001') > -1 || machines.indexOf(process.env.ETCD_HOST) > -1)
     t.end()
   })
 })
