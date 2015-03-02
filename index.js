@@ -315,7 +315,7 @@ Client.prototype._resolveToken = function (cb) {
     if (response.statusCode !== 200) return done(new Error('discovery token could not be resolved'))
 
     var nodes = response.body.node.nodes.map(function (node) {
-      return node.value
+      return node.value.replace(/:7001/g, ':4001') // remap ports for now - there is probably a better way
     })
 
     self._hosts = nodes
