@@ -37,9 +37,9 @@ var Client = function (host, opts) {
 
   if (!opts) opts = {}
 
-  var disc = /^https:\/\/discovery.etcd.io\//.test(host || '')
+  var disc = opts.token || /^https:\/\/discovery.etcd.io\//.test(host || '')
 
-  this._discovery = disc ? host : null
+  this._discovery = disc ? opts.token || host : null
 
   if (disc) this._hosts = []
   else this._hosts = [].concat(host || opts.host || opts.hosts || '127.0.0.1').map(normalizeUrl)
