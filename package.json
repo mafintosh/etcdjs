@@ -1,6 +1,6 @@
 {
   "name": "etcdjs",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Low level etcd v2 client written in Javascript with failover support",
   "repository": "mafintosh/etcdjs",
   "dependencies": {
