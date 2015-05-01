@@ -128,6 +128,16 @@ Client.prototype.wait = function (key, opts, cb) {
 
   return this.get(key, opts, function onresult (err, result) {
     if (err && err.code === 'ETIMEDOUT') return self.get(key, opts, onresult)
+    // if etcd returns a 401 with an index value, then we got killed because
+    // we tried to wait on an index value that was too old.
+    // we will use the new returned index as the starting point
+    // this does mean that we have technically missed change events and the more correct
+    // solution would be to do a `get` without the index and start waiting from there
+    // https://github.com/coreos/etcd/blob/master/Documentation/api.md#waiting-for-a-change
+    if (err && err.code === 401 && err.message === 'The event in requested index is outdated and cleared' && err.index) {
+      opts.waitIndex = err.index + 1;
+      return self.get(key, opts, onresult);
+    }
     if (result) opts.waitIndex = result.node.modifiedIndex + 1
     if (err) return cb(err, null, next)
     cb(null, result, next)
