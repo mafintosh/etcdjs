@@ -2,8 +2,8 @@ var test = require('./helpers/test')
 
 test('get not found', function (store, t) {
   store.get('etcdjs/test', function (err, result) {
-    t.ok(!err)
-    t.ok(!result)
+    t.ok(!err, 'no error')
+    t.ok(!result, 'no result')
     t.end()
   })
 })
@@ -11,8 +11,8 @@ test('get not found', function (store, t) {
 test('set and get', function (store, t) {
   store.set('etcdjs/test', 'world', function () {
     store.get('etcdjs/test', function (err, result) {
-      t.ok(!err)
-      t.same(result.node.value, 'world')
+      t.ok(!err, 'no error')
+      t.same(result.node.value, 'world', 'result matches set value')
       t.end()
     })
   })
@@ -21,10 +21,10 @@ test('set and get', function (store, t) {
 test('del', function (store, t) {
   store.set('etcdjs/test', 'world', function () {
     store.del('etcdjs/test', function (err) {
-      t.ok(!err)
+      t.ok(!err, 'no error')
       store.get('etcdjs/test', function (err, result) {
-        t.ok(!err)
-        t.ok(!result)
+        t.ok(!err, 'no error')
+        t.ok(!result, 'no result (deleted)')
         t.end()
       })
     })
@@ -33,14 +33,14 @@ test('del', function (store, t) {
 
 test('ttl', function (store, t) {
   store.set('etcdjs/test', 'world', {ttl: 1}, function (err) {
-    t.ok(!err)
+    t.ok(!err, 'no error')
     store.get('etcdjs/test', function (err, result) {
-      t.ok(!err)
-      t.same(result.node.value, 'world')
+      t.ok(!err, 'no error')
+      t.same(result.node.value, 'world', 'value matches (not yet expired)')
       setTimeout(function () {
         store.get('etcdjs/test', function (err, result) {
-          t.ok(!err)
-          t.ok(!result)
+          t.ok(!err, 'no error')
+          t.ok(!result, 'no result (expired)')
           t.end()
         })
       }, 2000)
