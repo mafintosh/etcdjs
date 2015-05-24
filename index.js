@@ -1,5 +1,7 @@
-var request = require('request')
+var request = require('client-request')
 var roundround = require('roundround')
+var FormData = require('form-urlencoded')
+var stringify = require('querystring').stringify
 
 var noop = function () {}
 
@@ -84,8 +86,9 @@ Client.prototype.set = function (key, value, opts, cb) {
   this._request({
     method: 'PUT',
     uri: this._key(key),
-    form: form,
-    json: true
+    body: FormData.encode(form),
+    json: true,
+    headers: {"content-type": "application/x-www-form-urlencoded"}
   }, cb)
 }
 
@@ -107,10 +110,10 @@ Client.prototype.get = function (key, opts, cb) {
   if (opts.recursive) qs.recursive = 'true'
   if (opts.sorted) qs.sorted = 'true'
   if (opts.consistent) qs.consistent = 'true'
+  var queryString = (Object.keys(qs).length) ? '?' + stringify(qs) : ''
 
   return this._request({
-    uri: this._key(key),
-    qs: qs,
+    uri: this._key(key) + queryString,
     json: true,
     pool: opts.wait ? false : undefined
   }, cb)
@@ -156,11 +159,11 @@ Client.prototype.del = Client.prototype.delete = function (key, opts, cb) {
   if (opts.prevIndex !== undefined) qs.prevIndex = '' + opts.prevIndex
   if (opts.recursive) qs.recursive = 'true'
   if (opts.dir) qs.dir = 'true'
+  var queryString = (Object.keys(qs).length) ? '?' + stringify(qs) : ''
 
   this._request({
     method: 'DELETE',
-    uri: this._key(key),
-    qs: qs,
+    uri: this._key(key) + queryString,
     json: true
   }, cb)
 }
@@ -190,11 +193,12 @@ Client.prototype.push = function (key, value, opts, cb) {
   this._request({
     method: 'POST',
     uri: this._key(key),
-    form: {
+    body: FormData.encode({
       value: value,
       ttl: opts.ttl
-    },
-    json: true
+    }),
+    json: true,
+    headers: {"content-type": "application/x-www-form-urlencoded"}
   }, cb)
 }
 
@@ -221,7 +225,7 @@ Client.prototype.machines = function (cb) {
   this._request({uri: '/v2/machines'}, function (err, body) {
     if (err) return cb(err)
 
-    body = body.trim()
+    body = body.toString().trim()
     var hosts = body.split(/\s*,\s*/)
 
     if (self._refresh && body !== self._prev) {
@@ -320,7 +324,7 @@ Client.prototype._resolveToken = function (cb) {
     self._wait = null
   }
 
-  request(this._discovery, {json: true}, function (err, response) {
+  request({uri: this._discovery, json: true}, function (err, response) {
     if (err) return done(err)
     if (response.statusCode !== 200) return done(new Error('discovery token could not be resolved'))
 
@@ -349,19 +353,24 @@ Client.prototype._request2 = function (opts, cb) {
 
   if (this._destroyed) return nextTick(cb, new Error('store destroyed'))
 
-  var req = request(opts, function onresponse (err, response) {
+  var req = request(opts, function onresponse (err, response, body) {
     gc(self._requests, req)
 
     if (canceled) return
     if (self._destroyed) return cb(new Error('store destroyed'))
-    if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse)
+    if (err && tries-- > 0) {
+      opts.uri = self._next() + path
+      return request(opts, onresponse)
+    }
     if (err) return cb(err)
 
-    if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse)
+    if (response.statusCode === 307) {
+      opts.uri = response.headers.location
+      return request(opts, onresponse)
+    }
     if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb()
     if (response.statusCode > 299) return cb(toError(response))
 
-    var body = response.body
     if (!self._json || !body.node) return cb(null, body)
 
     try {
