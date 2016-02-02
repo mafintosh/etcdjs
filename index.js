@@ -69,7 +69,7 @@ Client.prototype.set = function (key, value, opts, cb) {
   if (typeof opts === 'function') return this.set(key, value, null, opts)
   if (!opts) opts = {}
   if (!cb) cb = noop
-  if (this._json) value = JSON.stringify(value)
+  if (this._json || opts.json) value = JSON.stringify(value)
 
   var form = {}
 
@@ -113,7 +113,12 @@ Client.prototype.get = function (key, opts, cb) {
     qs: qs,
     json: true,
     pool: opts.wait ? false : undefined
-  }, cb)
+  }, function (err, body) {
+    if (err) return cb(err)
+
+    if (opts.json) decodeJSON(body.node);
+    cb(null, body)
+  });
 }
 
 Client.prototype.wait = function (key, opts, cb) {
