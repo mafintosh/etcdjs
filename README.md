@@ -60,6 +60,7 @@ Get a key. `opts` defaults to
 {
   recursive: false,
   sorted: false,
+  json: false,      // parse value as JSON for this request
   wait: false,
   waitIndex: (none)
 }
@@ -73,6 +74,7 @@ Set a key. `opts` defaults to
 {
   ttl: (none),
   dir: false,
+  json: false,      // stringify value as JSON for this request
   prevExist: (none),
   prevValue: (none),
   prevIndex: (none)

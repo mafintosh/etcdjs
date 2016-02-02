@@ -18,6 +18,16 @@ test('set and get', function (store, t) {
   })
 })
 
+test('set and get with json option', function (store, t) {
+  store.set('etcdjs/test', {hello: 'world'}, {json: true}, function () {
+    store.get('etcdjs/test', {json: true}, function (err, result) {
+      t.ok(!err, 'no error')
+      t.same(result.node.value, {hello: 'world'}, 'result is object that matches set value')
+      t.end()
+    })
+  })
+})
+
 test('del', function (store, t) {
   store.set('etcdjs/test', 'world', function () {
     store.del('etcdjs/test', function (err) {
