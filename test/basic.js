@@ -8,6 +8,14 @@ test('get not found', function (store, t) {
   })
 })
 
+test('get with json option not found', function (store, t) {
+  store.get('etcdjs/test', {json: true}, function (err, result) {
+    t.ok(!err, 'no error')
+    t.ok(!result, 'no result')
+    t.end()
+  })
+})
+
 test('set and get', function (store, t) {
   store.set('etcdjs/test', 'world', function () {
     store.get('etcdjs/test', function (err, result) {

@@ -116,7 +116,7 @@ Client.prototype.get = function (key, opts, cb) {
   }, function (err, body) {
     if (err) return cb(err)
 
-    if (opts.json) decodeJSON(body.node);
+    if (opts.json && body) decodeJSON(body.node);
     cb(null, body)
   });
 }
