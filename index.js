@@ -244,7 +244,7 @@ Client.prototype.machines = function (cb) {
 }
 
 Client.prototype.leader = function (cb) {
-  this._request({uri: '/v2/leader'}, cb)
+  this._request({uri: '/v2/stats/leader'}, cb)
 }
 
 Client.prototype.destroy = function () {

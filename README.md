@@ -1,6 +1,6 @@
 # etcdjs
 
-Low level etcd v2 client written in Javascript with failover support
+Low level etcd v2 & v3 client written in Javascript with failover support
 
 ```
 npm install etcdjs
