@@ -1,5 +1,8 @@
-var request = require('request')
-var roundround = require('roundround')
+const request = require('request')
+const http = require('http')
+const concat = require('concat-stream')
+const url = require('url')
+const roundround = require('roundround')
 
 var noop = function () {}
 
@@ -354,29 +357,74 @@ Client.prototype._request2 = function (opts, cb) {
 
   if (this._destroyed) return nextTick(cb, new Error('store destroyed'))
 
-  var req = request(opts, function onresponse (err, response) {
+
+  const uriparts = url.parse(opts.uri)
+  opts.hostname = uriparts.hostname
+  opts.port = parseInt(uriparts.port)
+  opts.path = uriparts.path
+
+  let qss = []
+  for(let q in opts.qs) {
+    qss.push(`${q}=${opts.qs[q]}`)
+  }
+
+  if(qss.length)
+    opts.path += '?' + qss.join('&')
+
+  let forms = []
+  for(let q in opts.form) {
+    if(typeof opts.form[q] != 'undefined')
+      forms.push(`${q}=${opts.form[q]}`)
+  }
+
+  if (forms.length) {
+    opts.headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(forms.join('&'))
+    }
+  }
+
+  var req = http.request(opts, function onresponse (response) {
     gc(self._requests, req)
+    response.setEncoding('utf8');
 
     if (canceled) return
     if (self._destroyed) return cb(new Error('store destroyed'))
-    if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse)
-    if (err) return cb(err)
+   // if (err && tries-- > 0) return request(opts.uri = self._next() + path, opts, onresponse)
+    //if (err) return cb(err)
+
+    console.log(response.statusCode)
 
     if (response.statusCode === 307) return request(opts.uri = response.headers.location, opts, onresponse)
     if (response.statusCode === 404 && !opts.method || opts.method === 'GET') return cb()
     if (response.statusCode > 299) return cb(toError(response))
 
-    var body = response.body
-    if (!self._json || !body.node) return cb(null, body)
+    response.pipe(concat((body) => {
 
-    try {
-      decodeJSON(body.node)
-    } catch (err) {
-      return cb(err)
-    }
+      if (response.headers['content-type'] ==='application/json') {
+        try {
+          body = JSON.parse(body)
+        } catch (err) {
+          return cb(err)
+        }
+      }
+      
+      if (!self._json || !body.node) return cb(null, body)
 
-    cb(null, body)
+      try {
+        decodeJSON(body.node)
+      } catch (err) {
+        return cb(err)
+      }
+
+      cb(null, body)
+    }))
   })
+  
+  if (forms.length) {
+    req.write(forms.join('&'))
+  }
+  req.end();
 
   this._requests.push(req)
 

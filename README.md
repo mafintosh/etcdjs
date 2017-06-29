@@ -2,6 +2,8 @@
 
 Low level etcd v2 & v3 client written in Javascript with failover support
 
+This client is for the JSON API only, not the new gRPC endpoints in etcd v3
+
 ```
 npm install etcdjs
 ```
@@ -12,7 +14,7 @@ Pass a connection string
 
 ``` js
 var etcdjs = require('etcdjs')
-var store = etcdjs('127.0.0.1:4001')
+var store = etcdjs('127.0.0.1:2379')
 
 store.set('hello', 'world', function(err, result) {
   store.get('hello', function(err, result) {
@@ -24,7 +26,7 @@ store.set('hello', 'world', function(err, result) {
 If you have more than run instance of etcd running you can pass an array to load balance
 
 ``` js
-var store = etcdjs(['127.0.0.1:4001', '127.0.0.1:4002', '127.0.0.1:4003'])
+var store = etcdjs(['127.0.0.1:2379', '127.0.0.1:2380', '127.0.0.1:2381'])
 ```
 
 If you have a discovery token from https://discovery.etcd.io/ you can also pass that
